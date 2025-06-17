@@ -10,7 +10,7 @@ class User:
             raise ValueError
         if password == "" or len(password) < 6:
             raise ValueError
-        if not age.isnumeric() or 5 > age or age > 65:
+        if not (5 <= age <= 65):
             raise ValueError
         if not gender.lower() in ["male", "female"]:
             raise ValueError
@@ -67,8 +67,8 @@ class User:
                 except EOFError:
                     print("❌ Progress not found.")
                     return None
-            except:
-                print("❌ ERROR: Enter correct values.\n")
+            except (ValueError, EOFError) as e:
+                print(f"❌ ERROR: {str(e) or 'Enter correct values.'}\n")
                 continue
 
     @classmethod
@@ -195,6 +195,7 @@ class Game:
         z.remove(b)
         c = random.choice(z)
         z.remove(c)
+        k = False
         while True:
             ans = input(
                 f'{riddle.replace('\'','').replace('\"','')}\nOptions->\n1.) {a}\n2.) {b}\n3.) {c}\n4.) {z[0]}\nChoose The Correct Option(Type 1,2,3,4 Only) -> '
