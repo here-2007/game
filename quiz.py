@@ -1,281 +1,272 @@
-import pickle
-import random
-import time
-import google.generativeai as genai
+from game_logic import User, Game
+# import pickle # No longer directly used in quiz.py main
+# import random # No longer directly used in quiz.py main
+# import time # No longer directly used in quiz.py main
+# import google.generativeai as genai # No longer directly used in quiz.py main
+import tkinter as tk
+from tkinter import messagebox
 
+# Global variable to store the currently logged-in user's data
+current_user = None
 
-class User:
-    def __init__(self, uid, name, password, gender, age, score=0, lvl=1, iq=10):
-        if name == "":
-            raise ValueError
-        if password == "" or len(password) < 6:
-            raise ValueError
-        if not (5 <= age <= 65):
-            raise ValueError
-        if not gender.lower() in ["male", "female"]:
-            raise ValueError
-        self.uid = uid
-        self.name = name
-        self.password = password
-        self.gender = gender
-        self.age = age
-        self.lvl = lvl
-        self.iq = iq
-        self.score = score
+def show_register_window(parent):
+    register_window = tk.Toplevel(parent)
+    register_window.title("Register New User")
+    register_window.geometry("350x250")
+    register_window.grab_set() # Make modal
 
-    def save(self):
-        # Save credentials
-        with open("user_data.bin", "ab") as f:
-            pickle.dump({"UID": self.uid, "Pass": self.password}, f)
-        # Save progress
-        with open("progress.bin", "ab") as f:
-            pickle.dump(
-                {
-                    "UID": self.uid,
-                    "Name": self.name,
-                    "Gender": self.gender,
-                    "Score": self.score,
-                    "Age": self.age,
-                    "LVL": self.lvl,
-                    "IQ": self.iq,
-                },
-                f,
-            )
+    tk.Label(register_window, text="Name:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    name_entry = tk.Entry(register_window, width=30)
+    name_entry.grid(row=0, column=1, padx=10, pady=5)
 
-    @classmethod
-    def register(cls):
-        while True:
-            try:
-                name = input("Name -> ")
-                password = input("Password(must be atleast 6 char long) -> ")
-                gender = input("Gender(Male or Female) -> ")
-                age = int(input("Age(Should be Numeric between 5 and 65) -> "))
-                uid = cls._generate_uid()
+    tk.Label(register_window, text="Password:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    password_entry = tk.Entry(register_window, show="*", width=30)
+    password_entry.grid(row=1, column=1, padx=10, pady=5)
 
-                user = cls(uid, name, password, gender, age)
-                user.save()
+    tk.Label(register_window, text="Gender (Male/Female):").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+    gender_entry = tk.Entry(register_window, width=30)
+    gender_entry.grid(row=2, column=1, padx=10, pady=5)
 
-                print(
-                    f"\n✅ Registration Successful!\nUID ->{uid}\nPassword -> {password}"
-                )
-                try:
-                    with open("progress.bin", "rb") as f:
-                        while True:
-                            data = pickle.load(f)
-                            if data["UID"] == uid:
-                                return data
-                except EOFError:
-                    print("❌ Progress not found.")
-                    return None
-            except (ValueError, EOFError) as e:
-                print(f"❌ ERROR: {str(e) or 'Enter correct values.'}\n")
-                continue
+    tk.Label(register_window, text="Age:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+    age_entry = tk.Entry(register_window, width=30)
+    age_entry.grid(row=3, column=1, padx=10, pady=5)
 
-    @classmethod
-    def login(cls, uid, password):
-        # Check UID and password match
+    def handle_register():
+        name = name_entry.get()
+        password = password_entry.get()
+        gender = gender_entry.get()
+        age = age_entry.get()
+
         try:
-            with open("user_data.bin", "rb") as f:
-                while True:
-                    data = pickle.load(f)
-                    if data["UID"] == uid:
-                        if data["Pass"] == password:
-                            # Load full user progress
-                            try:
-                                with open("progress.bin", "rb") as f:
-                                    while True:
-                                        data = pickle.load(f)
-                                        if data["UID"] == uid:
-                                            print("✅ Login successful.")
-                                            print(
-                                                f"✅ UID-> {data['UID']}\nLVL -> {data['LVL']}\nCurrent IQ->{data['IQ']}\n\n"
-                                            )
-                                            return data
-                            except EOFError:
-                                print("❌ Progress not found.")
-                                return None
-                        else:
-                            print("❌ WRONG PASSWORD.")
-                            return None
-        except (EOFError, FileNotFoundError):
-            print("❌ UID not found. Please register.")
-            return None
-
-    @staticmethod
-    def _generate_uid():
-        uids = []
-        try:
-            with open("user_data.bin", "rb") as f:
-                while True:
-                    data = pickle.load(f)
-                    uids.append(data["UID"])
-        except (EOFError, FileNotFoundError):
-            pass
-
-        while True:
-            new_uid = random.randint(10000000000, 99999999999)
-            if new_uid not in uids:
-                return new_uid
-
-    @classmethod
-    def level_up(cls, uid, score):
-        users = []
-        with open("progress.bin", "rb") as f:
-            try:
-                while True:
-                    user = pickle.load(f)
-                    users.append(user)
-            except EOFError:
-                pass
-        for user in users:
-            if user["UID"] == uid:
-                user["Score"] += score
-                iq = round(10 + (user["Score"] * 5))
-                user["IQ"] = iq
-                user["LVL"] = round(iq / 10)
-                # print(f"✅ UID-> {uid}\nLVL -> {user['LVL']}\nIQ->{user['IQ']}\n\n")
-                with open("progress.bin", "wb") as f:
-                    for user in users:
-                        pickle.dump(user, f)
-                return user
-
-
-class Game:
-    def __init__(self, user):
-        self.user = user
-        self.age = user["Age"]
-        self.uid = user["UID"]
-        self.gender = user["Gender"]
-        self.score = user["Score"]
-        self.iq = user["IQ"]
-        genai.configure(api_key="AIzaSyB-VF5G5nbrTDzrdfLsIEyk3JRlnUsndIo")
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
-
-    def play(self):
-        print("Press Ctrl+D To Quit.")
-        while True:
-            try:
-                self.quiz()
-            except:
-                print()
-                break
-
-    def quiz(self):
-        response = self.model.generate_content(
-            f"""
-        Generate a riddle appropriate for a person with:
-        - Age: {self.age}
-        - Gender: {self.gender}
-        - Difficulty level: {self.score} as high the score make the riddles more dificilut a score of 3 means you need to make riddles very very difivult and unique also as high it increases make it more dificult even a genius can't solve it.
-            Don't repeat the same riddle again and again bring something new..
-        Provide exactly **four answer options**, one of which is correct.
-        Return your response strictly in this format:
-        [Riddle, Correct_Answer, Option1, Option2, Option3, Option4]
-
-        Make sure the correct answer is one of the four options. The riddle should be creative and appropriate for the given age and difficulty.
-        """
-        )
-        raw = (
-            response.text.lstrip()
-            .rstrip()
-            .replace("[", "")
-            .replace("]", "")
-            .split(",")[::-1]
-        )
-        riddle = ""
-        for i in raw[len(raw) : 3 : -1]:
-            riddle += i
-        st = time.time()
-        # print(raw)
-        # print(riddle)
-        z = [raw[0], raw[1], raw[2], raw[3]]
-        a = random.choice(z)
-        z.remove(a)
-        b = random.choice(z)
-        z.remove(b)
-        c = random.choice(z)
-        z.remove(c)
-        k = False
-        while True:
-            ans = input(
-                f'{riddle.replace('\'','').replace('\"','')}\nOptions->\n1.) {a}\n2.) {b}\n3.) {c}\n4.) {z[0]}\nChoose The Correct Option(Type 1,2,3,4 Only) -> '
-            )
-            if ans in ["1", "2", "3", "4"]:
-                if ans == "1":
-                    if a == raw[3]:
-                        k = True
-                elif ans == "2":
-                    if b == raw[3]:
-                        k = True
-                elif ans == "3":
-                    if c == raw[3]:
-                        k = True
-                else:
-                    if z[0] == raw[3]:
-                        k = True
-                break
+            user_data = User.register(name, password, gender, age)
+            if user_data:
+                messagebox.showinfo("Success", f"Registration successful!\nUID: {user_data['UID']}\nPlease login.", parent=register_window)
+                register_window.destroy()
             else:
-                print("Invalid Input....\nEnter Again.")
-        et = time.time()
-        tt = et - st
-        if k:
-            users = []
-            with open("progress.bin", "rb") as f:
-                try:
-                    while True:
-                        user = pickle.load(f)
-                        users.append(user)
-                except EOFError:
-                    pass
-            for user in users:
-                if user["UID"] == self.uid:
-                    user["Score"] += 0.1
-                    n = User.level_up(self.uid, user["Score"])
-                    print(
-                        f"✅Correct Answer In {tt} Seconds\nUID-> {self.uid}\nLVL -> {n['LVL']}\nIQ->{n['IQ']}\n\n"
-                    )
-                    break
+                # This case should ideally be handled by User.register raising an exception
+                messagebox.showerror("Error", "Registration failed. Please try again.", parent=register_window)
+        except ValueError as e:
+            messagebox.showerror("Input Error", str(e), parent=register_window)
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}", parent=register_window)
+
+    register_btn = tk.Button(register_window, text="Register", command=handle_register)
+    register_btn.grid(row=4, column=0, columnspan=2, pady=10)
+
+# Updated signature to accept button references from main window
+def show_login_window(parent, main_register_button, main_login_button, main_start_game_button):
+    global current_user
+    login_window = tk.Toplevel(parent)
+    login_window.title("Login")
+    login_window.geometry("300x150")
+    login_window.grab_set() # Make modal
+
+    tk.Label(login_window, text="UID:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    uid_entry = tk.Entry(login_window, width=25)
+    uid_entry.grid(row=0, column=1, padx=10, pady=5)
+
+    tk.Label(login_window, text="Password:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    password_entry = tk.Entry(login_window, show="*", width=25)
+    password_entry.grid(row=1, column=1, padx=10, pady=5)
+
+    # Need to access buttons from parent (main window) to change their state
+    # We assume parent is the root window and has these buttons defined as attributes or easily accessible
+    # This is a simplification; a more robust way is to pass button references directly or use a class structure.
+    def handle_login(main_register_button, main_login_button, main_start_game_button):
+        global current_user
+        uid = uid_entry.get()
+        password = password_entry.get()
+
+        try:
+            user_data = User.login(uid, password)
+            if user_data:
+                current_user = user_data
+                messagebox.showinfo("Success", f"Login successful!\nWelcome, {current_user['Name']}!", parent=login_window)
+                login_window.destroy()
+
+                # Update main window buttons
+                if main_start_game_button:
+                    main_start_game_button.config(state=tk.NORMAL)
+                if main_register_button:
+                    main_register_button.config(state=tk.DISABLED)
+                if main_login_button:
+                    main_login_button.config(state=tk.DISABLED)
+                print(f"User {current_user['Name']} logged in. UID: {current_user['UID']}")
+            else:
+                messagebox.showerror("Error", "Login failed. Invalid UID or password.", parent=login_window)
+        except ValueError as e:
+            messagebox.showerror("Login Error", str(e), parent=login_window)
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}", parent=login_window)
+
+    # Pass references to main window buttons to handle_login
+    # This requires main_register_button, main_login_button, main_start_game_button to be defined in main()
+    # and accessible here. This is tricky with current structure.
+    # A common way is if main() passes its button references to show_login_window.
+    # For now, let's assume these buttons are accessible via parent.children or specific names.
+    # This is a bit of a hack for simplicity:
+    # We'll fetch them in main and pass them to show_login_window.
+
+    # The command for login_btn is now set here, using the passed button references
+    login_btn = tk.Button(login_window, text="Login", command=lambda: handle_login(main_register_button, main_login_button, main_start_game_button))
+    login_btn.grid(row=2, column=0, columnspan=2, pady=10)
+    # This was the missing piece: login_btn needs to call handle_login with the button args.
+
+def show_game_window(parent):
+    global current_user
+    if not current_user:
+        messagebox.showerror("Error", "You must be logged in to start the game.", parent=parent)
+        return
+
+    game_window = tk.Toplevel(parent)
+    game_window.title("Quiz Game - In Progress")
+    game_window.geometry("500x400")
+    game_window.grab_set() # Make window modal
+
+    game_instance = Game(current_user)
+    # Store the correct answer for the current riddle to check against submission
+    # This needs to be part of the game_window's state or accessible to handle_submit_answer
+    # Making it a list to use pass-by-reference semantics for nested functions
+    current_riddle_data = {"correct_answer_text": None}
+
+
+    # --- StringVars for dynamic labels ---
+    score_var = tk.StringVar(value=f"Score: {current_user.get('Score', 0)}")
+    level_var = tk.StringVar(value=f"Level: {current_user.get('LVL', 0)}") # LVL from user_data
+    iq_var = tk.StringVar(value=f"IQ: {current_user.get('IQ', 0)}")
+    riddle_text_var = tk.StringVar(value="Loading riddle...")
+    selected_option_var = tk.StringVar() # For Radiobuttons
+
+    # --- UI Elements ---
+    stats_frame = tk.Frame(game_window)
+    stats_frame.pack(pady=10)
+    tk.Label(stats_frame, textvariable=score_var).pack(side=tk.LEFT, padx=10)
+    tk.Label(stats_frame, textvariable=level_var).pack(side=tk.LEFT, padx=10)
+    tk.Label(stats_frame, textvariable=iq_var).pack(side=tk.LEFT, padx=10)
+
+    tk.Label(game_window, textvariable=riddle_text_var, wraplength=480, justify=tk.CENTER).pack(pady=20)
+
+    options_frame = tk.Frame(game_window)
+    options_frame.pack(pady=10)
+
+    radio_buttons = []
+    radio_option_vars = [tk.StringVar() for _ in range(4)] # Text for each radio button label
+    for i in range(4):
+        rb = tk.Radiobutton(options_frame, textvariable=radio_option_vars[i], variable=selected_option_var, value=f"option_{i}")
+        rb.pack(anchor=tk.W)
+        radio_buttons.append(rb)
+
+    # --- Helper Functions ---
+    def update_stats_labels(stats_dict):
+        score_var.set(f"Score: {stats_dict.get('Score', 0):.1f}") # Assuming score can be float
+        level_var.set(f"Level: {stats_dict.get('LVL', 0)}")
+        iq_var.set(f"IQ: {stats_dict.get('IQ', 0)}")
+
+    def load_new_riddle_ui():
+        riddle_text, options, correct_answer = game_instance.get_new_riddle()
+        if riddle_text and options and correct_answer:
+            riddle_text_var.set(riddle_text)
+            current_riddle_data["correct_answer_text"] = correct_answer
+
+            selected_option_var.set(None) # Deselect previous answer
+
+            for i, opt_text in enumerate(options):
+                if i < len(radio_option_vars):
+                    radio_option_vars[i].set(opt_text)
+                    # Set the value of radio button to the actual option text for easier checking
+                    radio_buttons[i].config(value=opt_text)
+
+            # Initial stats update from game_instance (which got it from current_user)
+            update_stats_labels({"Score": game_instance.score, "LVL": User.level_up(game_instance.uid,0)['LVL'], "IQ": game_instance.iq})
+
         else:
-            print(f"Wrong Answer.. \nCorrect answer Was ->{raw[3]}")
+            messagebox.showerror("Game Error", "Failed to load a new riddle. The API might be unavailable or returned an unexpected format.", parent=game_window)
+            # Consider disabling submit button or closing game window
+            submit_button.config(state=tk.DISABLED)
+
+    def handle_submit_answer():
+        submitted_text = selected_option_var.get()
+        if not submitted_text or not current_riddle_data["correct_answer_text"]:
+            messagebox.showwarning("No Answer", "Please select an answer.", parent=game_window)
+            return
+
+        is_correct, new_stats = game_instance.check_answer_and_update_score(submitted_text, current_riddle_data["correct_answer_text"])
+
+        if is_correct:
+            messagebox.showinfo("Correct!", "Well done! Your stats have been updated.", parent=game_window)
+        else:
+            messagebox.showerror("Incorrect", f"Sorry, that's not right. The correct answer was: {current_riddle_data['correct_answer_text']}", parent=game_window)
+
+        update_stats_labels(new_stats)
+        load_new_riddle_ui() # Load next riddle
+
+    submit_button = tk.Button(game_window, text="Submit Answer", command=handle_submit_answer)
+    submit_button.pack(pady=20)
+
+    # --- Initial Load ---
+    load_new_riddle_ui()
 
 
 def main():
-    r = input(
-        "Welcme Back\n1.) REGISTER(YOU'RE NEW)\n2.) LOGIN(IF ALREADY REGISTERED)\nChoose From Above Options(ONLY '1' Or '2') ->"
-    )
-    if r == "1":
-        user = User.register()
-        a = input('START THE GAME??("Y" or "N") ->')
-        if a.lower() == "y":
-            game = Game(user)
-            game.play()
-        elif a.lower == "n":
-            print("QUITING......\nDONE")
-        else:
-            print("Invalid Input....")
-            raise ValueError
-    elif r == "2":
-        user = User.login(
-            int(input("ENTER THE UID ->")), input("ENTER THE PASSWORD ->")
-        )
-        while True:
-            try:
-                a = input('START THE GAME??("Y" or "N") ->')
-                if a.lower() == "y":
-                    game = Game(user)
-                    game.play()
-                    break
-                elif a.lower == "n":
-                    print("QUITING......\nDONE")
-                    break
-                else:
-                    print("Invalid Input....")
-                    raise ValueError
-            except:
-                continue
-    else:
-        print("Invalid Input...")
-        raise ValueError
+    root = tk.Tk()
+    root.title("Quiz Game")
+    root.geometry("300x250") # Increased height for new button
+
+    # Define buttons here so they can be passed to show_login_window's handler
+    register_button = tk.Button(root, text="Register", command=lambda: show_register_window(root))
+    login_button = tk.Button(root, text="Login") # Command will be set later
+    start_game_button = tk.Button(root, text="Start Game", state=tk.DISABLED, command=lambda: show_game_window(root))
+    quit_button = tk.Button(root, text="Quit", command=root.destroy)
+
+    # Now set the login_button command, passing other buttons for state change
+    # This lambda captures the button variables from main's scope.
+    login_button.config(command=lambda: show_login_window(root, register_button, login_button, start_game_button))
+
+    # Layout buttons
+    register_button.pack(pady=10)
+    login_button.pack(pady=10)
+    start_game_button.pack(pady=10)
+    quit_button.pack(pady=10)
+
+    root.mainloop()
+
+    # The old command-line input logic is now removed/commented out.
+    # r = input(
+    #     "Welcme Back\n1.) REGISTER(YOU'RE NEW)\n2.) LOGIN(IF ALREADY REGISTERED)\nChoose From Above Options(ONLY '1' Or '2') ->"
+    # )
+    # if r == "1":
+    #     user = User.register()
+    #     a = input('START THE GAME??("Y" or "N") ->')
+    #     if a.lower() == "y":
+    #         game = Game(user)
+    #         game.play()
+    #     elif a.lower == "n":
+    #         print("QUITING......\nDONE")
+    #     else:
+    #         print("Invalid Input....")
+    #         raise ValueError
+    # elif r == "2":
+    #     user = User.login(
+    #         int(input("ENTER THE UID ->")), input("ENTER THE PASSWORD ->")
+    #     )
+    #     while True:
+    #         try:
+    #             a = input('START THE GAME??("Y" or "N") ->')
+    #             if a.lower() == "y":
+    #                 game = Game(user)
+    #                 game.play()
+    #                 break
+    #             elif a.lower == "n":
+    #                 print("QUITING......\nDONE")
+    #                 break
+    #             else:
+    #                 print("Invalid Input....")
+    #                 raise ValueError
+    #         except:
+    #             continue
+    # else:
+    #     print("Invalid Input...")
+    #     raise ValueError
 
 
 if __name__ == "__main__":
