@@ -2,6 +2,8 @@ import pickle
 import random
 import time
 import google.generativeai as genai
+from dotenv import load_dotenv
+import os
 
 
 class User:
@@ -97,7 +99,7 @@ class User:
                         else:
                             print("❌ WRONG PASSWORD.")
                             return None
-        except (EOFError, FileNotFoundError):
+        except:
             print("❌ UID not found. Please register.")
             return None
 
@@ -148,7 +150,8 @@ class Game:
         self.gender = user["Gender"]
         self.score = user["Score"]
         self.iq = user["IQ"]
-        genai.configure(api_key="AIzaSyB-VF5G5nbrTDzrdfLsIEyk3JRlnUsndIo")
+        load_dotenv()
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         self.model = genai.GenerativeModel("gemini-2.0-flash")
 
     def play(self):
@@ -249,7 +252,7 @@ def main():
         if a.lower() == "y":
             game = Game(user)
             game.play()
-        elif a.lower == "n":
+        elif a.lower() == "n":
             print("QUITING......\nDONE")
         else:
             print("Invalid Input....")
